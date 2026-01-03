@@ -1,6 +1,6 @@
 {
 	"name": "rising-stars-game-api",
-	"description": "Complete backend API template using Hono + Chanfana + D1 + Vitest.",
+	"description": "Backend for Roblox Game Rising Stars.",
 	"cloudflare": {
 		"label": "Backend OpenAPI Template",
 		"products": [
