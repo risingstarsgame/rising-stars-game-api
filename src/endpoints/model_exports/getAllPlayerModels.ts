@@ -59,12 +59,32 @@ export class GetAllPlayerExportedModels extends OpenAPIRoute {
         const now = new Date();
         const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-        const modelsWithExpiration = results.map((model: any) => ({
-            ...model,
-            player_user_id: Number(model.player_user_id),
-            created_at: new Date(model.created_at).toISOString(),
-            is_expired: new Date(model.created_at) < twentyFourHoursAgo,
-        }));
+        // Separate expired and non-expired models
+        const expiredIds: string[] = [];
+        const modelsWithExpiration = results.map((model: any) => {
+            const isExpired = new Date(model.created_at) < twentyFourHoursAgo;
+            
+            if (isExpired) {
+                expiredIds.push(model.id);
+            }
+            
+            return {
+                ...model,
+                player_user_id: Number(model.player_user_id),
+                created_at: new Date(model.created_at).toISOString(),
+                is_expired: isExpired,
+            };
+        });
+
+        // Delete all expired models in a single transaction if there are any
+        if (expiredIds.length > 0) {
+            // Create a parameterized query with all expired IDs
+            const placeholders = expiredIds.map(() => '?').join(',');
+            await c.env.DB.prepare(`
+                DELETE FROM model_exports 
+                WHERE id IN (${placeholders})
+            `).bind(...expiredIds).run();
+        }
 
         return {
             success: true,

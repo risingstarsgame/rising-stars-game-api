@@ -20,8 +20,7 @@ export class ImportModel extends OpenAPIRoute {
                     result: z.object({
                         id: z.string(),
                         serialized_data: z.string(),
-                        was_expired: z.boolean(),
-                        deleted: z.boolean(),
+                        is_expired: z.boolean(),
                     }),
                 }),
             },
@@ -70,25 +69,20 @@ export class ImportModel extends OpenAPIRoute {
         const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
         const isExpired = createdAt < twentyFourHoursAgo;
 
-        // Prepare response
-        const response = {
-            success: true,
-            result: {
-                id: model.id,
-                serialized_data: model.serialized_data,
-                was_expired: isExpired,
-                deleted: false,
-            },
-        };
-
-        // If expired, delete after returning the data
+        // If expired, delete it from the database
         if (isExpired) {
             await c.env.DB.prepare(`
                 DELETE FROM model_exports WHERE id = ?
             `).bind(id).run();
-            response.result.deleted = true;
         }
 
-        return response;
+        return {
+            success: true,
+            result: {
+                id: model.id,
+                serialized_data: model.serialized_data,
+                is_expired: isExpired,
+            },
+        };
     }
 }
