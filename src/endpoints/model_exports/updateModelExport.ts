@@ -18,7 +18,7 @@ export class UpdateModelExport extends OpenAPIRoute {
         },
         responses: {
             "200": {
-                description: "Model updated successfully",
+                description: "Model updated or expired status returned",
                 ...contentJson({
                     success: z.boolean(),
                     result: z.object({
@@ -26,6 +26,7 @@ export class UpdateModelExport extends OpenAPIRoute {
                         player_user_id: z.number(),
                         serialized_data: z.string(),
                         created_at: z.string().datetime(),
+                        is_expired: z.boolean(),
                     }),
                 }),
             },
@@ -82,7 +83,31 @@ export class UpdateModelExport extends OpenAPIRoute {
             );
         }
 
-        // Update the model
+        // Check if expired (24 hours)
+        const createdAt = new Date(existingModel.created_at);
+        const now = new Date();
+        const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        const isExpired = createdAt < twentyFourHoursAgo;
+
+        // If expired, delete it and return with is_expired: true
+        if (isExpired) {
+            await c.env.DB.prepare(`
+                DELETE FROM model_exports WHERE id = ?
+            `).bind(id).run();
+            
+            return {
+                success: true,
+                result: {
+                    id: existingModel.id,
+                    player_user_id: Number(existingModel.player_user_id),
+                    serialized_data: existingModel.serialized_data,
+                    created_at: new Date(existingModel.created_at).toISOString(),
+                    is_expired: true,
+                },
+            };
+        }
+
+        // Update the model if not expired
         await c.env.DB.prepare(`
             UPDATE model_exports 
             SET serialized_data = ?
@@ -100,6 +125,7 @@ export class UpdateModelExport extends OpenAPIRoute {
                 ...updatedModel,
                 player_user_id: Number(updatedModel.player_user_id),
                 created_at: new Date(updatedModel.created_at).toISOString(),
+                is_expired: false,
             },
         };
     }
