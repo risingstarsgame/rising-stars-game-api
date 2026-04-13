@@ -52,7 +52,7 @@ export class UpdateModelExport extends OpenAPIRoute {
             );
         }
 
-        const kv = c.env.MODEL_EXPORTS;
+        const kv = c.env.KV;
         const modelRaw = await kv.get(id);
         if (modelRaw === null) {
             return c.json(

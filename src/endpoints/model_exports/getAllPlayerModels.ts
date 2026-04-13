@@ -41,7 +41,7 @@ export class GetAllPlayerExportedModels extends OpenAPIRoute {
             );
         }
 
-        const kv = c.env.MODEL_EXPORTS;
+        const kv = c.env.KV;
         const playerKey = `player:${playerId}:models`;
         const playerModelsRaw = await kv.get(playerKey);
         let modelIds: string[] = playerModelsRaw ? JSON.parse(playerModelsRaw) : [];

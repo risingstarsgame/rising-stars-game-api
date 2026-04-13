@@ -28,7 +28,7 @@ export class ImportModel extends OpenAPIRoute {
 
     public async handle(c: any) {
         const { id } = c.req.param();
-        const kv = c.env.MODEL_EXPORTS;
+        const kv = c.env.KV;
 
         const modelRaw = await kv.get(id);
         if (modelRaw === null) {

@@ -51,7 +51,7 @@ export class CreateModelExport extends OpenAPIRoute {
             );
         }
 
-        const kv = c.env.MODEL_EXPORTS;
+        const kv = c.env.KV;
         const playerKey = `player:${body.player_user_id}:models`;
 
         // Get current player's model list

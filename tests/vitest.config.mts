@@ -12,7 +12,7 @@ export default defineWorkersConfig({
 		target: "esnext",
 	},
 	test: {
-		setupFiles: ["./tests/apply-migrations.ts"],
+		// setupFiles removed (was ["./tests/apply-migrations.ts"])
 		poolOptions: {
 			workers: {
 				singleWorker: true,
