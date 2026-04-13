@@ -13,7 +13,7 @@ export class GetAllPlayerExportedModels extends OpenAPIRoute {
         },
         responses: {
             "200": {
-                description: "Returns all models for the player",
+                description: "Returns all models for the player (expired ones automatically excluded)",
                 ...contentJson({
                     success: z.boolean(),
                     result: z.array(
@@ -31,64 +31,47 @@ export class GetAllPlayerExportedModels extends OpenAPIRoute {
     };
 
     public async handle(c: any) {
-        // Get params from the request
         const { player_user_id } = c.req.param();
         const playerId = parseInt(player_user_id, 10);
 
         if (isNaN(playerId) || playerId <= 0) {
             return c.json(
-                {
-                    success: false,
-                    errors: [{
-                        code: 400,
-                        message: "Invalid player_user_id",
-                    }],
-                },
+                { success: false, errors: [{ code: 400, message: "Invalid player_user_id" }] },
                 400
             );
         }
 
-        // Get all models for this player
-        const { results } = await c.env.DB.prepare(`
-            SELECT * FROM model_exports 
-            WHERE player_user_id = ?
-            ORDER BY created_at DESC
-        `).bind(playerId).all();
+        const kv = c.env.MODEL_EXPORTS;
+        const playerKey = `player:${playerId}:models`;
+        const playerModelsRaw = await kv.get(playerKey);
+        let modelIds: string[] = playerModelsRaw ? JSON.parse(playerModelsRaw) : [];
 
-        // Check expiration (24 hours)
-        const now = new Date();
-        const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        const models = [];
+        const validIds = [];
 
-        // Separate expired and non-expired models
-        const expiredIds: string[] = [];
-        const modelsWithExpiration = results.map((model: any) => {
-            const isExpired = new Date(model.created_at) < twentyFourHoursAgo;
-            
-            if (isExpired) {
-                expiredIds.push(model.id);
+        for (const id of modelIds) {
+            const modelRaw = await kv.get(id);
+            if (modelRaw !== null) {
+                const model = JSON.parse(modelRaw);
+                models.push({
+                    ...model,
+                    player_user_id: Number(model.player_user_id),
+                    created_at: model.created_at,
+                    is_expired: false, // KV automatically expired, so if we got it, it's not expired
+                });
+                validIds.push(id);
             }
-            
-            return {
-                ...model,
-                player_user_id: Number(model.player_user_id),
-                created_at: new Date(model.created_at).toISOString(),
-                is_expired: isExpired,
-            };
-        });
+            // If modelRaw is null, it expired and was auto-deleted by KV – we skip it
+        }
 
-        // Delete all expired models in a single transaction if there are any
-        if (expiredIds.length > 0) {
-            // Create a parameterized query with all expired IDs
-            const placeholders = expiredIds.map(() => '?').join(',');
-            await c.env.DB.prepare(`
-                DELETE FROM model_exports 
-                WHERE id IN (${placeholders})
-            `).bind(...expiredIds).run();
+        // Update player's list to remove expired IDs
+        if (validIds.length !== modelIds.length) {
+            await kv.put(playerKey, JSON.stringify(validIds));
         }
 
         return {
             success: true,
-            result: modelsWithExpiration,
+            result: models,
         };
     }
 }

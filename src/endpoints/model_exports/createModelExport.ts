@@ -1,6 +1,8 @@
 import { OpenAPIRoute, contentJson } from "chanfana";
 import { z } from "zod";
 
+const TWENTY_FOUR_HOURS_SECONDS = 60 * 60 * 24;
+
 export class CreateModelExport extends OpenAPIRoute {
     public schema = {
         tags: ["Model Exports"],
@@ -37,118 +39,77 @@ export class CreateModelExport extends OpenAPIRoute {
             body = await c.req.json();
         } catch (error) {
             return c.json(
-                {
-                    success: false,
-                    errors: [{
-                        code: 400,
-                        message: "Invalid JSON body",
-                    }],
-                },
+                { success: false, errors: [{ code: 400, message: "Invalid JSON body" }] },
                 400
             );
         }
 
-        // Validate required fields
         if (!body.player_user_id || !body.serialized_data) {
             return c.json(
-                {
-                    success: false,
-                    errors: [{
-                        code: 400,
-                        message: "Missing required fields: player_user_id and serialized_data are required",
-                    }],
-                },
+                { success: false, errors: [{ code: 400, message: "Missing required fields: player_user_id and serialized_data" }] },
                 400
             );
         }
 
-        // Check if player already has 5 models
-        const countResult = await c.env.DB.prepare(`
-            SELECT COUNT(*) as count FROM model_exports 
-            WHERE player_user_id = ?
-        `).bind(body.player_user_id).first();
+        const kv = c.env.MODEL_EXPORTS;
+        const playerKey = `player:${body.player_user_id}:models`;
 
-        if (countResult && countResult.count >= 5) {
+        // Get current player's model list
+        let playerModelsRaw = await kv.get(playerKey);
+        let playerModelIds: string[] = playerModelsRaw ? JSON.parse(playerModelsRaw) : [];
+
+        if (playerModelIds.length >= 5) {
             return c.json(
-                {
-                    success: false,
-                    errors: [{
-                        code: 4001,
-                        message: "Player cannot have more than 5 model exports",
-                    }],
-                },
+                { success: false, errors: [{ code: 4001, message: "Player cannot have more than 5 model exports" }] },
                 400
             );
         }
 
-        // Generate ID if not provided (12-digit number)
+        // Generate ID if not provided
         const id = body.id || this.generateTwelveDigitId();
-        
-        // Validate ID format
         if (!/^\d{12}$/.test(id)) {
             return c.json(
-                {
-                    success: false,
-                    errors: [{
-                        code: 400,
-                        message: "ID must be a 12-digit number",
-                    }],
-                },
+                { success: false, errors: [{ code: 400, message: "ID must be a 12-digit number" }] },
                 400
             );
         }
 
         // Check if ID already exists
-        const existingModel = await c.env.DB.prepare(`
-            SELECT id FROM model_exports WHERE id = ?
-        `).bind(id).first();
-
-        if (existingModel) {
+        const existing = await kv.get(id);
+        if (existing !== null) {
             return c.json(
-                {
-                    success: false,
-                    errors: [{
-                        code: 4002,
-                        message: "Model with this ID already exists",
-                    }],
-                },
+                { success: false, errors: [{ code: 4002, message: "Model with this ID already exists" }] },
                 400
             );
         }
 
         const createdAt = new Date().toISOString();
-        
-        // Insert the model
-        await c.env.DB.prepare(`
-            INSERT INTO model_exports (id, player_user_id, serialized_data, created_at)
-            VALUES (?, ?, ?, ?)
-        `).bind(
+        const modelValue = {
             id,
-            body.player_user_id,
-            body.serialized_data,
-            createdAt
-        ).run();
+            player_user_id: body.player_user_id,
+            serialized_data: body.serialized_data,
+            created_at: createdAt,
+        };
 
-        // Return the created model
+        // Store model with 24h TTL
+        await kv.put(id, JSON.stringify(modelValue), { expirationTtl: TWENTY_FOUR_HOURS_SECONDS });
+
+        // Update player's model list
+        playerModelIds.push(id);
+        await kv.put(playerKey, JSON.stringify(playerModelIds));
+
         return c.json(
             {
                 success: true,
-                result: {
-                    id,
-                    player_user_id: body.player_user_id,
-                    serialized_data: body.serialized_data,
-                    created_at: createdAt,
-                },
+                result: modelValue,
             },
             201
         );
     }
 
     private generateTwelveDigitId(): string {
-        // Generate a 12-digit numeric ID
-        const min = 100000000000; // 12 digits minimum
-        const max = 999999999999; // 12 digits maximum
-        const id = Math.floor(Math.random() * (max - min + 1)) + min;
-        return id.toString();
+        const min = 100000000000;
+        const max = 999999999999;
+        return (Math.floor(Math.random() * (max - min + 1)) + min).toString();
     }
 }

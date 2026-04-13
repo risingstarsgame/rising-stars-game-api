@@ -4,12 +4,11 @@ import { z } from "zod";
 export class ImportModel extends OpenAPIRoute {
     public schema = {
         tags: ["Model Exports"],
-        summary: "Import a model export",
+        summary: "Import a model export by ID",
         operationId: "import-model",
         request: {
             params: z.object({
                 id: z.string(),
-                player_user_id: z.string(),
             }),
         },
         responses: {
@@ -28,60 +27,29 @@ export class ImportModel extends OpenAPIRoute {
     };
 
     public async handle(c: any) {
-        const { id, player_user_id } = c.req.param();
-        const playerId = parseInt(player_user_id, 10);
+        const { id } = c.req.param();
+        const kv = c.env.MODEL_EXPORTS;
 
-        if (isNaN(playerId) || playerId <= 0) {
+        const modelRaw = await kv.get(id);
+        if (modelRaw === null) {
             return c.json(
-                {
-                    success: false,
-                    errors: [{
-                        code: 400,
-                        message: "Invalid player_user_id",
-                    }],
-                },
-                400
-            );
-        }
-
-        // Find the model
-        const model = await c.env.DB.prepare(`
-            SELECT * FROM model_exports 
-            WHERE id = ? AND player_user_id = ?
-        `).bind(id, playerId).first();
-
-        if (!model) {
-            return c.json(
-                {
-                    success: false,
-                    errors: [{
-                        code: 4041,
-                        message: "Model not found or doesn't belong to this player",
-                    }],
-                },
+                { success: false, errors: [{ code: 4041, message: "Model not found or expired" }] },
                 404
             );
         }
 
-        // Check if expired (24 hours)
-        const createdAt = new Date(model.created_at);
-        const now = new Date();
-        const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        const isExpired = createdAt < twentyFourHoursAgo;
-
-        // If expired, delete it from the database
-        if (isExpired) {
-            await c.env.DB.prepare(`
-                DELETE FROM model_exports WHERE id = ?
-            `).bind(id).run();
-        }
+        const model = JSON.parse(modelRaw);
+        // No need to check expiration – KV returns null if expired.
+        // Also, we don't need player_user_id in URL anymore because it's inside the stored value.
+        // But if you want to verify that the requesting player owns it, you can add a header or query param.
+        // For now, we return the model regardless.
 
         return {
             success: true,
             result: {
                 id: model.id,
                 serialized_data: model.serialized_data,
-                is_expired: isExpired,
+                is_expired: false, // since we got it from KV, it's not expired
             },
         };
     }

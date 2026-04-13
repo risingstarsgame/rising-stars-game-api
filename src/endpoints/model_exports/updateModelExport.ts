@@ -4,7 +4,7 @@ import { z } from "zod";
 export class UpdateModelExport extends OpenAPIRoute {
     public schema = {
         tags: ["Model Exports"],
-        summary: "Update a model export's serialized data",
+        summary: "Update a model export's serialized data (TTL unchanged)",
         operationId: "update-model-export",
         request: {
             params: z.object({
@@ -18,7 +18,7 @@ export class UpdateModelExport extends OpenAPIRoute {
         },
         responses: {
             "200": {
-                description: "Model updated or expired status returned",
+                description: "Model updated",
                 ...contentJson({
                     success: z.boolean(),
                     result: z.object({
@@ -35,96 +35,57 @@ export class UpdateModelExport extends OpenAPIRoute {
 
     public async handle(c: any) {
         const { id } = c.req.param();
-        
         let body;
         try {
             body = await c.req.json();
         } catch (error) {
             return c.json(
-                {
-                    success: false,
-                    errors: [{
-                        code: 400,
-                        message: "Invalid JSON body",
-                    }],
-                },
+                { success: false, errors: [{ code: 400, message: "Invalid JSON body" }] },
                 400
             );
         }
 
         if (!body.serialized_data) {
             return c.json(
-                {
-                    success: false,
-                    errors: [{
-                        code: 400,
-                        message: "serialized_data is required",
-                    }],
-                },
+                { success: false, errors: [{ code: 400, message: "serialized_data is required" }] },
                 400
             );
         }
 
-        // First check if model exists
-        const existingModel = await c.env.DB.prepare(`
-            SELECT * FROM model_exports WHERE id = ?
-        `).bind(id).first();
-
-        if (!existingModel) {
+        const kv = c.env.MODEL_EXPORTS;
+        const modelRaw = await kv.get(id);
+        if (modelRaw === null) {
             return c.json(
-                {
-                    success: false,
-                    errors: [{
-                        code: 4041,
-                        message: "Model not found",
-                    }],
-                },
+                { success: false, errors: [{ code: 4041, message: "Model not found or expired" }] },
                 404
             );
         }
 
-        // Check if expired (24 hours)
-        const createdAt = new Date(existingModel.created_at);
-        const now = new Date();
-        const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        const isExpired = createdAt < twentyFourHoursAgo;
+        const model = JSON.parse(modelRaw);
+        // Update only the serialized_data
+        model.serialized_data = body.serialized_data;
 
-        // If expired, delete it and return with is_expired: true
-        if (isExpired) {
-            await c.env.DB.prepare(`
-                DELETE FROM model_exports WHERE id = ?
-            `).bind(id).run();
-            
-            return {
-                success: true,
-                result: {
-                    id: existingModel.id,
-                    player_user_id: Number(existingModel.player_user_id),
-                    serialized_data: existingModel.serialized_data,
-                    created_at: new Date(existingModel.created_at).toISOString(),
-                    is_expired: true,
-                },
-            };
+        // Preserve original expiration: created_at + 24 hours
+        const createdAtDate = new Date(model.created_at);
+        const expirationTimestamp = Math.floor(createdAtDate.getTime() / 1000) + (24 * 60 * 60);
+        const nowSeconds = Math.floor(Date.now() / 1000);
+
+        if (expirationTimestamp <= nowSeconds) {
+            // Model is already expired (should not happen because get returned non-null, but just in case)
+            return c.json(
+                { success: false, errors: [{ code: 410, message: "Model already expired" }] },
+                410
+            );
         }
 
-        // Update the model if not expired
-        await c.env.DB.prepare(`
-            UPDATE model_exports 
-            SET serialized_data = ?
-            WHERE id = ?
-        `).bind(body.serialized_data, id).run();
-
-        // Fetch the updated model
-        const updatedModel = await c.env.DB.prepare(`
-            SELECT * FROM model_exports WHERE id = ?
-        `).bind(id).first();
+        // Write back with the same absolute expiration time
+        await kv.put(id, JSON.stringify(model), { expiration: expirationTimestamp });
 
         return {
             success: true,
             result: {
-                ...updatedModel,
-                player_user_id: Number(updatedModel.player_user_id),
-                created_at: new Date(updatedModel.created_at).toISOString(),
+                ...model,
+                player_user_id: Number(model.player_user_id),
                 is_expired: false,
             },
         };

@@ -9,5 +9,5 @@ export const modelExportsRouter = fromHono(new Hono());
 
 modelExportsRouter.get("/player/:player_user_id", GetAllPlayerExportedModels);
 modelExportsRouter.post("/", CreateModelExport);
-modelExportsRouter.get("/import/:id/:player_user_id", ImportModel);
+modelExportsRouter.get("/import/:id", ImportModel);
 modelExportsRouter.put("/:id", UpdateModelExport);

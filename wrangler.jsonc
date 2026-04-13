@@ -12,5 +12,11 @@
 			"database_name": "rising-stars-game-api-db",
 			"database_id": "6c185fe0-4d75-4c18-9520-369a1f6daa2e"
 		}
+	],
+	"kv_namespaces": [
+		{
+			"binding": "KV",
+			"id": "6a65dd4b1d43463599cffa1276628f66"
+		}
 	]
 }
