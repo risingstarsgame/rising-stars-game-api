@@ -19,7 +19,7 @@ export class ImportModel extends OpenAPIRoute {
                     result: z.object({
                         id: z.string(),
                         serialized_data: z.string(),
-                        is_expired: z.boolean(),
+                        created_at: z.string().datetime(),
                     }),
                 }),
             },
@@ -28,7 +28,7 @@ export class ImportModel extends OpenAPIRoute {
 
     public async handle(c: any) {
         const { id } = c.req.param();
-        const kv = c.env.KV;
+        const kv = c.env['rising-stars-game-api-kv'];
 
         const modelRaw = await kv.get(id);
         if (modelRaw === null) {
@@ -39,17 +39,12 @@ export class ImportModel extends OpenAPIRoute {
         }
 
         const model = JSON.parse(modelRaw);
-        // No need to check expiration – KV returns null if expired.
-        // Also, we don't need player_user_id in URL anymore because it's inside the stored value.
-        // But if you want to verify that the requesting player owns it, you can add a header or query param.
-        // For now, we return the model regardless.
-
         return {
             success: true,
             result: {
                 id: model.id,
                 serialized_data: model.serialized_data,
-                is_expired: false, // since we got it from KV, it's not expired
+                created_at: model.created_at,
             },
         };
     }

@@ -12,7 +12,6 @@ export class CreateModelExport extends OpenAPIRoute {
             body: contentJson(
                 z.object({
                     id: z.string().regex(/^\d{12}$/, "ID must be a 12-digit number").optional(),
-                    player_user_id: z.number().int().positive(),
                     serialized_data: z.string().min(1, "Serialized data cannot be empty"),
                 })
             ),
@@ -24,7 +23,6 @@ export class CreateModelExport extends OpenAPIRoute {
                     success: z.boolean(),
                     result: z.object({
                         id: z.string(),
-                        player_user_id: z.number(),
                         serialized_data: z.string(),
                         created_at: z.string().datetime(),
                     }),
@@ -44,26 +42,14 @@ export class CreateModelExport extends OpenAPIRoute {
             );
         }
 
-        if (!body.player_user_id || !body.serialized_data) {
+        if (!body.serialized_data) {
             return c.json(
-                { success: false, errors: [{ code: 400, message: "Missing required fields: player_user_id and serialized_data" }] },
+                { success: false, errors: [{ code: 400, message: "serialized_data is required" }] },
                 400
             );
         }
 
-        const kv = c.env.KV;
-        const playerKey = `player:${body.player_user_id}:models`;
-
-        // Get current player's model list
-        let playerModelsRaw = await kv.get(playerKey);
-        let playerModelIds: string[] = playerModelsRaw ? JSON.parse(playerModelsRaw) : [];
-
-        if (playerModelIds.length >= 5) {
-            return c.json(
-                { success: false, errors: [{ code: 4001, message: "Player cannot have more than 5 model exports" }] },
-                400
-            );
-        }
+        const kv = c.env['rising-stars-game-api-kv'];
 
         // Generate ID if not provided
         const id = body.id || this.generateTwelveDigitId();
@@ -86,17 +72,12 @@ export class CreateModelExport extends OpenAPIRoute {
         const createdAt = new Date().toISOString();
         const modelValue = {
             id,
-            player_user_id: body.player_user_id,
             serialized_data: body.serialized_data,
             created_at: createdAt,
         };
 
         // Store model with 24h TTL
         await kv.put(id, JSON.stringify(modelValue), { expirationTtl: TWENTY_FOUR_HOURS_SECONDS });
-
-        // Update player's model list
-        playerModelIds.push(id);
-        await kv.put(playerKey, JSON.stringify(playerModelIds));
 
         return c.json(
             {

@@ -15,7 +15,7 @@
 	],
 	"kv_namespaces": [
 		{
-			"binding": "KV",
+			"binding": "rising-stars-game-api-kv",
 			"id": "6a65dd4b1d43463599cffa1276628f66"
 		}
 	]

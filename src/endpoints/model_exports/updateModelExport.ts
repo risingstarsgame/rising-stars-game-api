@@ -23,10 +23,8 @@ export class UpdateModelExport extends OpenAPIRoute {
                     success: z.boolean(),
                     result: z.object({
                         id: z.string(),
-                        player_user_id: z.number(),
                         serialized_data: z.string(),
                         created_at: z.string().datetime(),
-                        is_expired: z.boolean(),
                     }),
                 }),
             },
@@ -52,7 +50,7 @@ export class UpdateModelExport extends OpenAPIRoute {
             );
         }
 
-        const kv = c.env.KV;
+        const kv = c.env['rising-stars-game-api-kv'];
         const modelRaw = await kv.get(id);
         if (modelRaw === null) {
             return c.json(
@@ -71,22 +69,20 @@ export class UpdateModelExport extends OpenAPIRoute {
         const nowSeconds = Math.floor(Date.now() / 1000);
 
         if (expirationTimestamp <= nowSeconds) {
-            // Model is already expired (should not happen because get returned non-null, but just in case)
             return c.json(
                 { success: false, errors: [{ code: 410, message: "Model already expired" }] },
                 410
             );
         }
 
-        // Write back with the same absolute expiration time
         await kv.put(id, JSON.stringify(model), { expiration: expirationTimestamp });
 
         return {
             success: true,
             result: {
-                ...model,
-                player_user_id: Number(model.player_user_id),
-                is_expired: false,
+                id: model.id,
+                serialized_data: model.serialized_data,
+                created_at: model.created_at,
             },
         };
     }
