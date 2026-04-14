@@ -5,10 +5,11 @@ import { ContentfulStatusCode } from "hono/utils/http-status";
 
 const app = new Hono<{ Bindings: Env }>();
 
-// ----- API Key Middleware (protects all routes) -----
-app.use('*', async (c, next) => {
-  const apiKey = c.req.query('apiKey');
+// ----- API Key Middleware -----
+app.use('/exports/*', async (c, next) => {
+  const apiKey = c.req.header('authorization');
   const expectedKey = c.env.RISING_STARS_API_KEY;
+
   if (!apiKey || apiKey !== expectedKey) {
     return c.json(
       { success: false, errors: [{ code: 401, message: "Unauthorized: Invalid or missing API key" }] },
