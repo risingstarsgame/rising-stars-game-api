@@ -49,7 +49,7 @@ export class CreateModelExport extends OpenAPIRoute {
             );
         }
 
-        const kv = c.env['rising-stars-game-api-kv'];
+        const kv = c.env.MODEL_EXPORTS;
 
         // Generate ID if not provided
         const id = body.id || this.generateTwelveDigitId();
@@ -70,19 +70,22 @@ export class CreateModelExport extends OpenAPIRoute {
         }
 
         const createdAt = new Date().toISOString();
+        // Store only serialized_data and created_at
         const modelValue = {
-            id,
             serialized_data: body.serialized_data,
             created_at: createdAt,
         };
 
-        // Store model with 24h TTL
         await kv.put(id, JSON.stringify(modelValue), { expirationTtl: TWENTY_FOUR_HOURS_SECONDS });
 
         return c.json(
             {
                 success: true,
-                result: modelValue,
+                result: {
+                    id: id,
+                    serialized_data: body.serialized_data,
+                    created_at: createdAt,
+                },
             },
             201
         );

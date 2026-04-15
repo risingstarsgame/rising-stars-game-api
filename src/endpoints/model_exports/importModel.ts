@@ -28,7 +28,7 @@ export class ImportModel extends OpenAPIRoute {
 
     public async handle(c: any) {
         const { id } = c.req.param();
-        const kv = c.env['rising-stars-game-api-kv'];
+        const kv = c.env.MODEL_EXPORTS;
 
         const modelRaw = await kv.get(id);
         if (modelRaw === null) {
@@ -39,10 +39,11 @@ export class ImportModel extends OpenAPIRoute {
         }
 
         const model = JSON.parse(modelRaw);
+        // model does not contain an id field – we use the key name as id
         return {
             success: true,
             result: {
-                id: model.id,
+                id: id,
                 serialized_data: model.serialized_data,
                 created_at: model.created_at,
             },

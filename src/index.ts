@@ -39,8 +39,8 @@ const openapi = fromHono(app, {
   docs_url: "/",
   schema: {
     info: {
-      title: "Roblox Model Export API",
-      version: "1.0.2",
+      title: "Rising Stars Roblox API",
+      version: "1.0.3",
       description: "API for storing and retrieving Roblox model exports with 24-hour TTL using Workers KV",
     },
   },
