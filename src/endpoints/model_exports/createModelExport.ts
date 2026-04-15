@@ -49,7 +49,7 @@ export class CreateModelExport extends OpenAPIRoute {
             );
         }
 
-        const kv = c.env.MODEL_EXPORTS;
+        const kv = c.env['rising-stars-game-api-kv'];
 
         // Generate ID if not provided
         const id = body.id || this.generateTwelveDigitId();

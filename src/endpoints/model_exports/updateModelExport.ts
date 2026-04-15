@@ -50,7 +50,7 @@ export class UpdateModelExport extends OpenAPIRoute {
             );
         }
 
-        const kv = c.env.MODEL_EXPORTS;
+        const kv = c.env['rising-stars-game-api-kv'];
         const modelRaw = await kv.get(id);
         if (modelRaw === null) {
             return c.json(
