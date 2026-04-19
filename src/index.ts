@@ -1,5 +1,6 @@
 import { ApiException, fromHono } from "chanfana";
 import { Hono } from "hono";
+import { recordsRouter } from "./endpoints/records/router";
 import { modelExportsRouter } from "./endpoints/model_exports/router";
 import { ContentfulStatusCode } from "hono/utils/http-status";
 
