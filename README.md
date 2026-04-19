@@ -1,72 +1,191 @@
-# OpenAPI Template
+# Rising Stars Game API
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/templates/tree/main/chanfana-openapi-template)
+This Cloudflare Worker provides the backend for the Roblox game **Rising Stars**. It uses OpenAPI 3.1 auto-generation and validation via [chanfana](https://github.com/cloudflare/chanfana) and [Hono](https://hono.dev).
 
-![OpenAPI Template Preview](https://imagedelivery.net/wSMYJvS3Xw-n339CbDyDIA/91076b39-1f5b-46f6-7f14-536a6f183000/public)
+The project includes two main data storage systems:
 
-<!-- dash-content-start -->
+- **Model exports** stored in Workers KV with a 24-hour TTL.
+- **Performance recordings** stored in D1 (SQLite) with gzip compression for large JSON fields.
 
-This is a Cloudflare Worker with OpenAPI 3.1 Auto Generation and Validation using [chanfana](https://github.com/cloudflare/chanfana) and [Hono](https://github.com/honojs/hono).
+The API is protected by an API key middleware. All endpoints return consistent error structures with custom error codes.
 
-This is an example project made to be used as a quick start into building OpenAPI compliant Workers that generates the
-`openapi.json` schema automatically from code and validates the incoming request to the defined parameters or request body.
+---
 
-This template includes various endpoints, a D1 database, and integration tests using [Vitest](https://vitest.dev/) as examples. In endpoints, you will find [chanfana D1 AutoEndpoints](https://chanfana.com/endpoints/auto/d1) and a [normal endpoint](https://chanfana.com/endpoints/defining-endpoints) to serve as examples for your projects.
+## Project Structure
 
-Besides being able to see the OpenAPI schema (openapi.json) in the browser, you can also extract the schema locally no hassle by running this command `npm run schema`.
-
-<!-- dash-content-end -->
-
-> [!IMPORTANT]
-> When using C3 to create this project, select "no" when it asks if you want to deploy. You need to follow this project's [setup steps](https://github.com/cloudflare/templates/tree/main/openapi-template#setup-steps) before deploying.
-
-## Getting Started
-
-Outside of this repo, you can start a new project with this template using [C3](https://developers.cloudflare.com/pages/get-started/c3/) (the `create-cloudflare` CLI):
-
-```bash
-npm create cloudflare@latest -- --template=cloudflare/templates/openapi-template
+```
+src/index.ts                    – Main router, OpenAPI configuration, error handler, API key middleware.
+src/endpoints/model_exports/    – KV-based endpoints for model exports.
+src/endpoints/records/          – D1-based endpoints for performance recordings.
+src/utils/compression.ts        – Gzip compression/decompression utilities.
+migrations/                     – SQL migrations for the D1 database.
+tests/                          – Integration tests using Vitest.
 ```
 
-A live public deployment of this template is available at [https://openapi-template.templates.workers.dev](https://openapi-template.templates.workers.dev)
+---
 
-## Setup Steps
+## Endpoints
 
-1. Install the project dependencies with a package manager of your choice:
+### Model Exports (KV)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/exports` | Create a new model export. Requires `id`, `user_id`, `serialized_data`. Returns success and the created object. |
+| `GET` | `/exports/import/:id` | Retrieve a model export by `id`. Returns `404` if not found or expired. |
+| `PUT` | `/exports/:id` | Update `serialized_data` if not expired. Returns updated object or expired flag. |
+| `GET` | `/exports/player/:user_id` | List all non-expired exports for a player, automatically deleting expired ones. |
+
+### Performance Recordings (D1)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/records` | Store a new recording. Client provides `record_id` (UUID-like string). Returns `{ success: true }` on success. |
+| `GET` | `/records/:record_id` | Retrieve a recording. Decompresses gzipped JSON fields. Returns `404` if not found. |
+| `DELETE` | `/records/:record_id` | Delete a recording. Returns `{ success: true }` on success. |
+
+---
+
+## Data Schemas
+
+### Model Export (KV)
+
+```json
+{
+  "id": "string (client-provided)",
+  "user_id": "number",
+  "serialized_data": "string (arbitrary JSON)",
+  "created_at": "ISO datetime"
+}
+```
+
+### Performance Recording (D1)
+
+**Top-level fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `record_id` | string | Primary key |
+| `performance_id` | string | |
+| `user_id` | number | |
+| `outfit_id` | number (optional) | |
+| `frame_count` | number | |
+| `record_duration` | string | e.g. `"60.00"` |
+| `animation_tracks` | array of strings | |
+| `frame_interval_map` | array of strings | |
+| `frame_times` | array of strings or numbers | |
+| `created_at` | string | ISO datetime |
+
+**`frames` field** — array of objects with the following structure:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | number | |
+| `time` | number | |
+| `animationId` | number (optional) | |
+| `animationSpeed` | string (optional) | |
+| `emotePlaying` | boolean (optional) | |
+| `frameInterval` | number | Index into `frame_interval_map` |
+| `hrpRelativeCF` | object | Contains `pos` and `rot` arrays of strings |
+| `playerMessage` | string (optional) | |
+
+---
+
+## Technology Stack
+
+| Layer | Technology |
+|-------|------------|
+| Runtime | Cloudflare Workers |
+| Web framework | Hono |
+| OpenAPI integration | chanfana |
+| Validation | Zod |
+| Database | Cloudflare D1 (SQLite) |
+| Key-value store | Cloudflare Workers KV |
+| Compression | Native `CompressionStream` / `DecompressionStream` |
+| Testing | Vitest with `@cloudflare/vitest-pool-workers` |
+
+---
+
+## Setup for Local Development
+
+1. Install dependencies:
    ```bash
    npm install
    ```
-2. Create a [D1 database](https://developers.cloudflare.com/d1/get-started/) with the name "openapi-template-db":
+
+2. Create a D1 database and KV namespace. Update `wrangler.jsonc` with the generated IDs.
+
+3. Apply migrations:
    ```bash
-   npx wrangler d1 create openapi-template-db
+   npx wrangler d1 migrations apply DB --local
    ```
-   ...and update the `database_id` field in `wrangler.json` with the new database ID.
-3. Run the following db migration to initialize the database (notice the `migrations` directory in this project):
+
+4. Set the API key secret:
    ```bash
-   npx wrangler d1 migrations apply DB --remote
+   npx wrangler secret put RISING_STARS_API_KEY
    ```
-4. Deploy the project!
+
+5. Run locally:
    ```bash
-   npx wrangler deploy
+   npm run dev
    ```
-5. Monitor your worker
-   ```bash
-   npx wrangler tail
-   ```
+
+---
+
+## Deployment
+
+The project is deployed to a private Cloudflare Workers account. After configuring environment variables and bindings, deploy with:
+
+```bash
+npm run deploy
+```
+
+---
 
 ## Testing
 
-This template includes integration tests using [Vitest](https://vitest.dev/). To run the tests locally:
+Run integration tests with:
 
 ```bash
 npm run test
 ```
 
-Test files are located in the `tests/` directory, with examples demonstrating how to test your endpoints and database interactions.
+Tests use a local D1 instance with migrations applied automatically.
 
-## Project structure
+---
 
-1. Your main router is defined in `src/index.ts`.
-2. Each endpoint has its own file in `src/endpoints/`.
-3. Integration tests are located in the `tests/` directory.
-4. For more information read the [chanfana documentation](https://chanfana.com/), [Hono documentation](https://hono.dev/docs), and [Vitest documentation](https://vitest.dev/guide/).
+## Error Handling
+
+All errors follow this structure:
+
+```json
+{
+  "success": false,
+  "errors": [
+    {
+      "code": 4041,
+      "message": "Record not found"
+    }
+  ]
+}
+```
+
+**Custom error codes:**
+
+| Code | Description |
+|------|-------------|
+| `400` | Validation or malformed request |
+| `401` | Missing or invalid API key |
+| `4041` | Resource not found (record or export) |
+| `409` | Duplicate ID |
+| `5000` | Internal server error (D1 or KV failure) |
+| `7000` | Unhandled exception |
+
+---
+
+## OpenAPI Documentation
+
+The OpenAPI 3.1 schema is automatically generated and served at the root URL (`/`). To generate a local copy, run:
+
+```bash
+npm run schema
+```

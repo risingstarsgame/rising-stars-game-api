@@ -8,7 +8,7 @@ export class DeleteRecord extends OpenAPIRoute {
         operationId: 'delete-record',
         request: {
             params: z.object({
-                record_id: z.string().uuid(),
+                record_id: z.string().min(1),
             }),
         },
         responses: {
@@ -17,7 +17,6 @@ export class DeleteRecord extends OpenAPIRoute {
                 ...contentJson(
                     z.object({
                         success: z.boolean(),
-                        result: z.object({ deleted: z.boolean() }),
                     })
                 ),
             },
@@ -55,9 +54,6 @@ export class DeleteRecord extends OpenAPIRoute {
             .bind(record_id)
             .run();
 
-        return {
-            success: true,
-            result: { deleted: true },
-        };
+        return { success: true };
     }
 }

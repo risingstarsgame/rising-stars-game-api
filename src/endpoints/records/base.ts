@@ -13,7 +13,7 @@ export const frameSchema = z.object({
         rot: z.array(z.string()),
     }),
     playerMessage: z.string().optional(),
-}).catchall(z.any());
+});
 
 // Full record data
 export const recordSchema = z.object({
