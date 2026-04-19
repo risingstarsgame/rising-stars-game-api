@@ -19,16 +19,12 @@ export class CreateModelExport extends OpenAPIRoute {
         },
         responses: {
             "201": {
-                description: "Model export created successfully",
-                ...contentJson({
-                    success: z.boolean(),
-                    result: z.object({
-                        id: z.string(),
-                        user_id: z.number(),
-                        serialized_data: z.string(),
-                        created_at: z.string().datetime(),
-                    }),
-                }),
+                description: "Record created successfully",
+                ...contentJson(
+                    z.object({
+                        success: z.boolean(),
+                    })
+                ),
             },
         },
     };
@@ -54,7 +50,6 @@ export class CreateModelExport extends OpenAPIRoute {
         const kv = c.env['rising-stars-game-api-kv'];
         const id = body.id;
 
-        // Check if ID already exists
         const existing = await kv.get(id);
         if (existing !== null) {
             return c.json(
@@ -72,17 +67,6 @@ export class CreateModelExport extends OpenAPIRoute {
 
         await kv.put(id, JSON.stringify(modelValue), { expirationTtl: TWENTY_FOUR_HOURS_SECONDS });
 
-        return c.json(
-            {
-                success: true,
-                result: {
-                    id: id,
-                    user_id: body.user_id,
-                    serialized_data: body.serialized_data,
-                    created_at: createdAt,
-                },
-            },
-            201
-        );
+        return c.json({ success: true }, 201);
     }
 }

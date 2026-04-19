@@ -6,7 +6,7 @@ import { ContentfulStatusCode } from "hono/utils/http-status";
 const app = new Hono<{ Bindings: Env }>();
 
 // ----- API Key Middleware -----
-app.use('/exports/*', async (c, next) => {
+const authMiddleware = async (c, next) => {
   const apiKey = c.req.header('authorization');
   const expectedKey = c.env.RISING_STARS_API_KEY;
 
@@ -17,7 +17,10 @@ app.use('/exports/*', async (c, next) => {
     );
   }
   await next();
-});
+};
+
+app.use('/exports/*', authMiddleware);
+app.use('/records/*', authMiddleware);
 
 // ----- Error handler -----
 app.onError((err: any, c: any) => {
@@ -40,13 +43,14 @@ const openapi = fromHono(app, {
   schema: {
     info: {
       title: "Rising Stars Roblox API",
-      version: "1.0.3",
-      description: "API for storing and retrieving Roblox model exports with 24-hour TTL using Workers KV",
+      version: "1.0.5",
+      description: "API for storing and retrieving Roblox model exports (KV) and performance recordings (D1)",
     },
   },
 });
 
 // ----- Register KV routes  -----
 openapi.route("/exports", modelExportsRouter);
+openapi.route("/records", recordsRouter);
 
 export default app;
