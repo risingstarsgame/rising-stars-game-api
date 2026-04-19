@@ -12,6 +12,7 @@ export class CreateModelExport extends OpenAPIRoute {
             body: contentJson(
                 z.object({
                     id: z.string().min(1, "ID cannot be empty"),
+                    user_id: z.number().int().positive("user_id must be a positive integer"),
                     serialized_data: z.string().min(1, "Serialized data cannot be empty"),
                 })
             ),
@@ -23,6 +24,7 @@ export class CreateModelExport extends OpenAPIRoute {
                     success: z.boolean(),
                     result: z.object({
                         id: z.string(),
+                        user_id: z.number(),
                         serialized_data: z.string(),
                         created_at: z.string().datetime(),
                     }),
@@ -42,9 +44,9 @@ export class CreateModelExport extends OpenAPIRoute {
             );
         }
 
-        if (!body.id || !body.serialized_data) {
+        if (!body.id || !body.user_id || !body.serialized_data) {
             return c.json(
-                { success: false, errors: [{ code: 400, message: "id and serialized_data are required" }] },
+                { success: false, errors: [{ code: 400, message: "id, user_id, and serialized_data are required" }] },
                 400
             );
         }
@@ -63,6 +65,7 @@ export class CreateModelExport extends OpenAPIRoute {
 
         const createdAt = new Date().toISOString();
         const modelValue = {
+            user_id: body.user_id,
             serialized_data: body.serialized_data,
             created_at: createdAt,
         };
@@ -74,6 +77,7 @@ export class CreateModelExport extends OpenAPIRoute {
                 success: true,
                 result: {
                     id: id,
+                    user_id: body.user_id,
                     serialized_data: body.serialized_data,
                     created_at: createdAt,
                 },

@@ -18,6 +18,7 @@ export class ImportModel extends OpenAPIRoute {
                     success: z.boolean(),
                     result: z.object({
                         id: z.string(),
+                        user_id: z.number(),
                         serialized_data: z.string(),
                         created_at: z.string().datetime(),
                     }),
@@ -39,11 +40,11 @@ export class ImportModel extends OpenAPIRoute {
         }
 
         const model = JSON.parse(modelRaw);
-        // model does not contain an id field – we use the key name as id
         return {
             success: true,
             result: {
                 id: id,
+                user_id: model.user_id,
                 serialized_data: model.serialized_data,
                 created_at: model.created_at,
             },

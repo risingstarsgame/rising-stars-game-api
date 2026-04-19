@@ -23,6 +23,7 @@ export class UpdateModelExport extends OpenAPIRoute {
                     success: z.boolean(),
                     result: z.object({
                         id: z.string(),
+                        user_id: z.number(),
                         serialized_data: z.string(),
                         created_at: z.string().datetime(),
                     }),
@@ -60,7 +61,7 @@ export class UpdateModelExport extends OpenAPIRoute {
         }
 
         const model = JSON.parse(modelRaw);
-        // Update only the serialized_data
+        // Update only serialized_data; keep user_id and created_at
         model.serialized_data = body.serialized_data;
 
         // Preserve original expiration: created_at + 24 hours
@@ -75,13 +76,13 @@ export class UpdateModelExport extends OpenAPIRoute {
             );
         }
 
-        // Write back
         await kv.put(id, JSON.stringify(model), { expiration: expirationTimestamp });
 
         return {
             success: true,
             result: {
                 id: id,
+                user_id: model.user_id,
                 serialized_data: model.serialized_data,
                 created_at: model.created_at,
             },
