@@ -11,7 +11,7 @@ export class CreateModelExport extends OpenAPIRoute {
         request: {
             body: contentJson(
                 z.object({
-                    id: z.string().regex(/^\d{12}$/, "ID must be a 12-digit number").optional(),
+                    id: z.string().min(1, "ID cannot be empty"),
                     serialized_data: z.string().min(1, "Serialized data cannot be empty"),
                 })
             ),
@@ -42,35 +42,26 @@ export class CreateModelExport extends OpenAPIRoute {
             );
         }
 
-        if (!body.serialized_data) {
+        if (!body.id || !body.serialized_data) {
             return c.json(
-                { success: false, errors: [{ code: 400, message: "serialized_data is required" }] },
+                { success: false, errors: [{ code: 400, message: "id and serialized_data are required" }] },
                 400
             );
         }
 
         const kv = c.env['rising-stars-game-api-kv'];
-
-        // Generate ID if not provided
-        const id = body.id || this.generateTwelveDigitId();
-        if (!/^\d{12}$/.test(id)) {
-            return c.json(
-                { success: false, errors: [{ code: 400, message: "ID must be a 12-digit number" }] },
-                400
-            );
-        }
+        const id = body.id;
 
         // Check if ID already exists
         const existing = await kv.get(id);
         if (existing !== null) {
             return c.json(
-                { success: false, errors: [{ code: 4002, message: "Model with this ID already exists" }] },
-                400
+                { success: false, errors: [{ code: 409, message: "Model with this ID already exists" }] },
+                409
             );
         }
 
         const createdAt = new Date().toISOString();
-        // Store only serialized_data and created_at
         const modelValue = {
             serialized_data: body.serialized_data,
             created_at: createdAt,
@@ -89,11 +80,5 @@ export class CreateModelExport extends OpenAPIRoute {
             },
             201
         );
-    }
-
-    private generateTwelveDigitId(): string {
-        const min = 100000000000;
-        const max = 999999999999;
-        return (Math.floor(Math.random() * (max - min + 1)) + min).toString();
     }
 }
