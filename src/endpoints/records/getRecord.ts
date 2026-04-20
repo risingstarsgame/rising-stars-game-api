@@ -56,31 +56,42 @@ export class GetRecord extends OpenAPIRoute {
             );
         }
 
-        // Decompress JSON fields
-        const [animationTracks, frameIntervalMap, frameTimes, frames] = await Promise.all([
-            ungzipJson<unknown>(row.animation_tracks),
-            ungzipJson<unknown>(row.frame_interval_map),
-            ungzipJson<unknown>(row.frame_times),
-            ungzipJson<unknown>(row.frames),
-        ]);
+        try {
+            // Convert BLOB fields from ArrayBuffer to Uint8Array and decompress
+            const [animationTracks, frameIntervalMap, frameTimes, frames] = await Promise.all([
+                ungzipJson<unknown>(new Uint8Array(row.animation_tracks)),
+                ungzipJson<unknown>(new Uint8Array(row.frame_interval_map)),
+                ungzipJson<unknown>(new Uint8Array(row.frame_times)),
+                ungzipJson<unknown>(new Uint8Array(row.frames)),
+            ]);
 
-        const result = {
-            record_id: row.record_id,
-            performance_id: row.performance_id,
-            user_id: row.user_id,
-            outfit_id: row.outfit_id ?? undefined,
-            frame_count: row.frame_count,
-            record_duration: row.record_duration,
-            animation_tracks: animationTracks,
-            frame_interval_map: frameIntervalMap,
-            frame_times: frameTimes,
-            frames: frames,
-            created_at: row.created_at,
-        };
+            const result = {
+                record_id: row.record_id,
+                performance_id: row.performance_id,
+                user_id: row.user_id,
+                outfit_id: row.outfit_id ?? undefined,
+                frame_count: row.frame_count,
+                record_duration: row.record_duration,
+                animation_tracks: animationTracks,
+                frame_interval_map: frameIntervalMap,
+                frame_times: frameTimes,
+                frames: frames,
+                created_at: row.created_at,
+            };
 
-        return {
-            success: true,
-            result,
-        };
+            return {
+                success: true,
+                result,
+            };
+        } catch (err: any) {
+            console.error('Decompression error:', err);
+            return c.json(
+                {
+                    success: false,
+                    errors: [{ code: 5002, message: 'Failed to decompress record data' }],
+                },
+                500
+            );
+        }
     }
 }
