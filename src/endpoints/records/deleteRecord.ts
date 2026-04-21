@@ -4,7 +4,7 @@ import { z } from 'zod';
 export class DeleteRecord extends OpenAPIRoute {
     public schema = {
         tags: ['Records'],
-        summary: 'Delete a performance recording',
+        summary: 'Delete a performance record',
         operationId: 'delete-record',
         request: {
             params: z.object({

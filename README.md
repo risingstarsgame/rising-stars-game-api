@@ -5,7 +5,7 @@ This Cloudflare Worker provides the backend for the Roblox game **Rising Stars**
 The project includes two main data storage systems:
 
 - **Model exports** stored in Workers KV with a 24-hour TTL.
-- **Performance recordings** stored in D1 (SQLite) as gzip-compressed MessagePack blobs.
+- **Performance records** stored in D1 (SQLite) as gzip-compressed MessagePack blobs.
 
 The API is protected by an API key middleware. All endpoints return consistent error structures with custom error codes.
 
@@ -16,7 +16,7 @@ The API is protected by an API key middleware. All endpoints return consistent e
 ```
 src/index.ts                    – Main router, OpenAPI configuration, error handler, API key middleware.
 src/endpoints/model_exports/    – KV-based endpoints for model exports.
-src/endpoints/records/          – D1-based endpoints for performance recordings.
+src/endpoints/records/          – D1-based endpoints for performance records.
 src/utils/compression.ts        – Gzip decompression utilities.
 migrations/                     – SQL migrations for the D1 database.
 tests/                          – Integration tests using Vitest.
@@ -35,13 +35,13 @@ tests/                          – Integration tests using Vitest.
 | `PUT` | `/exports/:id` | Update `serialized_data` if not expired. Returns updated object or expired flag. |
 | `GET` | `/exports/player/:user_id` | List all non-expired exports for a player, automatically deleting expired ones. |
 
-### Performance Recordings (D1)
+### Performance Records (D1)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/records` | Store a new recording. Body must be a gzip-compressed MessagePack blob (`Content-Type: application/msgpack`, `Content-Encoding: gzip`). Metadata is passed via custom headers. Returns `{ success: true }` on success. |
-| `GET` | `/records/:record_id` | Retrieve a recording. Decompresses and decodes the MessagePack blob before returning. Returns `404` if not found. |
-| `DELETE` | `/records/:record_id` | Delete a recording. Returns `{ success: true }` on success. |
+| `POST` | `/records` | Store a new record. Body must be a gzip-compressed MessagePack blob (`Content-Type: application/msgpack`, `Content-Encoding: gzip`). Metadata is passed via custom headers. Returns `{ success: true }` on success. |
+| `GET` | `/records/:record_id` | Retrieve a record. Decompresses and decodes the MessagePack blob before returning. Returns `404` if not found. |
+| `DELETE` | `/records/:record_id` | Delete a record. Returns `{ success: true }` on success. |
 
 #### `POST /records` — Required Headers
 
@@ -52,7 +52,7 @@ tests/                          – Integration tests using Vitest.
 | `X-Record-Id` | string | Unique record identifier |
 | `X-Performance-Id` | string | Associated performance identifier |
 | `X-User-Id` | number | User who owns the record |
-| `X-Outfit-Id` | number (optional) | Outfit worn during the recording |
+| `X-Outfit-Id` | number (optional) | Outfit worn during the record |
 | `X-Frame-Count` | number | Total number of frames |
 | `X-Record-Duration` | number | Duration in seconds |
 
@@ -60,7 +60,7 @@ tests/                          – Integration tests using Vitest.
 
 ## Data Schemas
 
-### Model Export (KV)
+### Model Exports (KV)
 
 ```json
 {
@@ -71,7 +71,7 @@ tests/                          – Integration tests using Vitest.
 }
 ```
 
-### Performance Recording (D1)
+### Performance Records (D1)
 
 **Top-level fields:**
 

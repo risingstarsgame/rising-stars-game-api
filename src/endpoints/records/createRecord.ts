@@ -4,7 +4,7 @@ import { z } from 'zod';
 export class CreateRecord extends OpenAPIRoute {
     public schema = {
         tags: ['Records'],
-        summary: 'Store a new performance recording',
+        summary: 'Store a new performance record',
         operationId: 'create-record',
         request: {
             headers: z.object({
