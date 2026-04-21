@@ -5,7 +5,7 @@ This Cloudflare Worker provides the backend for the Roblox game **Rising Stars**
 The project includes two main data storage systems:
 
 - **Model exports** stored in Workers KV with a 24-hour TTL.
-- **Performance recordings** stored in D1 (SQLite) with gzip compression for large JSON fields.
+- **Performance recordings** stored in D1 (SQLite) as gzip-compressed MessagePack blobs.
 
 The API is protected by an API key middleware. All endpoints return consistent error structures with custom error codes.
 
@@ -17,7 +17,7 @@ The API is protected by an API key middleware. All endpoints return consistent e
 src/index.ts                    – Main router, OpenAPI configuration, error handler, API key middleware.
 src/endpoints/model_exports/    – KV-based endpoints for model exports.
 src/endpoints/records/          – D1-based endpoints for performance recordings.
-src/utils/compression.ts        – Gzip compression/decompression utilities.
+src/utils/compression.ts        – Gzip decompression utilities.
 migrations/                     – SQL migrations for the D1 database.
 tests/                          – Integration tests using Vitest.
 ```
@@ -39,9 +39,22 @@ tests/                          – Integration tests using Vitest.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/records` | Store a new recording. Client provides `record_id` (UUID-like string). Returns `{ success: true }` on success. |
-| `GET` | `/records/:record_id` | Retrieve a recording. Decompresses gzipped JSON fields. Returns `404` if not found. |
+| `POST` | `/records` | Store a new recording. Body must be a gzip-compressed MessagePack blob (`Content-Type: application/msgpack`, `Content-Encoding: gzip`). Metadata is passed via custom headers. Returns `{ success: true }` on success. |
+| `GET` | `/records/:record_id` | Retrieve a recording. Decompresses and decodes the MessagePack blob before returning. Returns `404` if not found. |
 | `DELETE` | `/records/:record_id` | Delete a recording. Returns `{ success: true }` on success. |
+
+#### `POST /records` — Required Headers
+
+| Header | Type | Description |
+|--------|------|-------------|
+| `Content-Type` | `application/msgpack` | Body encoding format |
+| `Content-Encoding` | `gzip` | Body compression |
+| `X-Record-Id` | string | Unique record identifier |
+| `X-Performance-Id` | string | Associated performance identifier |
+| `X-User-Id` | number | User who owns the record |
+| `X-Outfit-Id` | number (optional) | Outfit worn during the recording |
+| `X-Frame-Count` | number | Total number of frames |
+| `X-Record-Duration` | number | Duration in seconds |
 
 ---
 
@@ -69,10 +82,10 @@ tests/                          – Integration tests using Vitest.
 | `user_id` | number | |
 | `outfit_id` | number (optional) | |
 | `frame_count` | number | |
-| `record_duration` | string | e.g. `"60.00"` |
+| `record_duration` | number | Duration in seconds |
 | `animation_tracks` | array of strings | |
-| `frame_interval_map` | array of strings | |
-| `frame_times` | array of strings or numbers | |
+| `frame_interval_map` | array of numbers | |
+| `frame_times` | array of numbers | |
 | `created_at` | string | ISO datetime |
 
 **`frames` field** — array of objects with the following structure:
@@ -100,6 +113,7 @@ tests/                          – Integration tests using Vitest.
 | Validation | Zod |
 | Database | Cloudflare D1 (SQLite) |
 | Key-value store | Cloudflare Workers KV |
+| Serialization | MessagePack (`@msgpack/msgpack`) |
 | Compression | Native `CompressionStream` / `DecompressionStream` |
 | Testing | Vitest with `@cloudflare/vitest-pool-workers` |
 
@@ -178,6 +192,7 @@ All errors follow this structure:
 | `4041` | Resource not found (record or export) |
 | `409` | Duplicate ID |
 | `5000` | Internal server error (D1 or KV failure) |
+| `5002` | Failed to decompress or decode record blob |
 | `7000` | Unhandled exception |
 
 ---

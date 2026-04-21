@@ -1,5 +1,5 @@
 import { ApiException, fromHono } from "chanfana";
-import { Hono } from "hono";
+import { Hono, Context, Next } from "hono";
 import { recordsRouter } from "./endpoints/records/router";
 import { modelExportsRouter } from "./endpoints/model_exports/router";
 import { ContentfulStatusCode } from "hono/utils/http-status";
@@ -7,12 +7,12 @@ import { ContentfulStatusCode } from "hono/utils/http-status";
 const app = new Hono<{ Bindings: Env }>();
 
 // ----- API Key Middleware -----
-const authMiddleware = async (c, next) => {
-  const apiKey = c.req.header('authorization');
-  const expectedKey = c.env.RISING_STARS_API_KEY;
+const authMiddleware = async (context: Context, next: Next) => {
+  const apiKey = context.req.header('authorization');
+  const expectedKey = context.env.RISING_STARS_API_KEY;
 
   if (!apiKey || apiKey !== expectedKey) {
-    return c.json(
+    return context.json(
       { success: false, errors: [{ code: 401, message: "Unauthorized: Invalid or missing API key" }] },
       401
     );
@@ -24,15 +24,15 @@ app.use('/exports/*', authMiddleware);
 app.use('/records/*', authMiddleware);
 
 // ----- Error handler -----
-app.onError((err: any, c: any) => {
+app.onError((err: any, context: Context) => {
   if (err instanceof ApiException) {
-    return c.json(
+    return context.json(
       { success: false, errors: err.buildResponse() },
       err.status as ContentfulStatusCode,
     );
   }
   console.error("Global error handler caught:", err);
-  return c.json(
+  return context.json(
     { success: false, errors: [{ code: 7000, message: "Internal Server Error" }] },
     500,
   );
@@ -50,7 +50,7 @@ const openapi = fromHono(app, {
   },
 });
 
-// ----- Register KV routes  -----
+// ----- Register routes -----
 openapi.route("/exports", modelExportsRouter);
 openapi.route("/records", recordsRouter);
 

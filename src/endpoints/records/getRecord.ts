@@ -1,7 +1,8 @@
-import { OpenAPIRoute, contentJson } from 'chanfana';
+import { OpenAPIRoute } from 'chanfana';
 import { z } from 'zod';
-import { ungzipJson } from '../../utils/compression';
-import { recordSchema } from './base';
+import { recordResponseSchema } from './base';
+import { ungzipBlob } from '../../utils/compression';
+import { decode as msgpackDecode } from '@msgpack/msgpack';
 
 export class GetRecord extends OpenAPIRoute {
     public schema = {
@@ -16,21 +17,36 @@ export class GetRecord extends OpenAPIRoute {
         responses: {
             '200': {
                 description: 'Record data returned',
-                ...contentJson(
-                    z.object({
-                        success: z.boolean(),
-                        result: recordSchema,
-                    })
-                ),
+                content: {
+                    'application/json': {
+                        schema: z.object({
+                            success: z.boolean(),
+                            result: recordResponseSchema,
+                        }),
+                    },
+                },
             },
             '404': {
                 description: 'Record not found',
-                ...contentJson(
-                    z.object({
-                        success: z.boolean(),
-                        errors: z.array(z.object({ code: z.number(), message: z.string() })),
-                    })
-                ),
+                content: {
+                    'application/json': {
+                        schema: z.object({
+                            success: z.boolean(),
+                            errors: z.array(z.object({ code: z.number(), message: z.string() })),
+                        }),
+                    },
+                },
+            },
+            '500': {
+                description: 'Decompression error',
+                content: {
+                    'application/json': {
+                        schema: z.object({
+                            success: z.boolean(),
+                            errors: z.array(z.object({ code: z.number(), message: z.string() })),
+                        }),
+                    },
+                },
             },
         },
     };
@@ -40,30 +56,22 @@ export class GetRecord extends OpenAPIRoute {
 
         const row = await c.env.DB.prepare(
             `SELECT record_id, performance_id, user_id, outfit_id,
-                    frame_count, record_duration,
-                    animation_tracks, frame_interval_map, frame_times, frames,
-                    created_at
+                    frame_count, record_duration, data_blob, created_at
              FROM records WHERE record_id = ?`
         ).bind(record_id).first();
 
         if (!row) {
             return c.json(
-                {
-                    success: false,
-                    errors: [{ code: 4041, message: 'Record not found' }],
-                },
+                { success: false, errors: [{ code: 4041, message: 'Record not found' }] },
                 404
             );
         }
 
         try {
-            // Convert BLOB fields from ArrayBuffer to Uint8Array and decompress
-            const [animationTracks, frameIntervalMap, frameTimes, frames] = await Promise.all([
-                ungzipJson<unknown>(new Uint8Array(row.animation_tracks)),
-                ungzipJson<unknown>(new Uint8Array(row.frame_interval_map)),
-                ungzipJson<unknown>(new Uint8Array(row.frame_times)),
-                ungzipJson<unknown>(new Uint8Array(row.frames)),
-            ]);
+            // Decompress gzip
+            const decompressed = await ungzipBlob(new Uint8Array(row.data_blob));
+            // Decode MessagePack
+            const blobData = msgpackDecode(decompressed) as any;
 
             const result = {
                 record_id: row.record_id,
@@ -72,24 +80,18 @@ export class GetRecord extends OpenAPIRoute {
                 outfit_id: row.outfit_id ?? undefined,
                 frame_count: row.frame_count,
                 record_duration: row.record_duration,
-                animation_tracks: animationTracks,
-                frame_interval_map: frameIntervalMap,
-                frame_times: frameTimes,
-                frames: frames,
+                frames: blobData.frames,
+                frame_times: blobData.frameTimes,
+                frame_interval_map: blobData.frameIntervalMap,
+                animation_tracks: blobData.animationTracks,
                 created_at: row.created_at,
             };
 
-            return {
-                success: true,
-                result,
-            };
+            return { success: true, result };
         } catch (err: any) {
-            console.error('Decompression error:', err);
+            console.error('Decompression/decode error:', err);
             return c.json(
-                {
-                    success: false,
-                    errors: [{ code: 5002, message: 'Failed to decompress record data' }],
-                },
+                { success: false, errors: [{ code: 5002, message: 'Failed to decode record data' }] },
                 500
             );
         }

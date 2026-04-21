@@ -1,4 +1,4 @@
-import { OpenAPIRoute, contentJson } from 'chanfana';
+import { OpenAPIRoute } from 'chanfana';
 import { z } from 'zod';
 
 export class DeleteRecord extends OpenAPIRoute {
@@ -14,20 +14,33 @@ export class DeleteRecord extends OpenAPIRoute {
         responses: {
             '200': {
                 description: 'Record deleted successfully',
-                ...contentJson(
-                    z.object({
-                        success: z.boolean(),
-                    })
-                ),
+                content: {
+                    'application/json': {
+                        schema: z.object({ success: z.boolean() }),
+                    },
+                },
             },
             '404': {
                 description: 'Record not found',
-                ...contentJson(
-                    z.object({
-                        success: z.boolean(),
-                        errors: z.array(z.object({ code: z.number(), message: z.string() })),
-                    })
-                ),
+                content: {
+                    'application/json': {
+                        schema: z.object({
+                            success: z.boolean(),
+                            errors: z.array(z.object({ code: z.number(), message: z.string() })),
+                        }),
+                    },
+                },
+            },
+            '500': {
+                description: 'Database error',
+                content: {
+                    'application/json': {
+                        schema: z.object({
+                            success: z.boolean(),
+                            errors: z.array(z.object({ code: z.number(), message: z.string() })),
+                        }),
+                    },
+                },
             },
         },
     };
@@ -42,18 +55,23 @@ export class DeleteRecord extends OpenAPIRoute {
 
         if (!existing) {
             return c.json(
-                {
-                    success: false,
-                    errors: [{ code: 4041, message: 'Record not found' }],
-                },
+                { success: false, errors: [{ code: 4041, message: 'Record not found' }] },
                 404
             );
         }
 
-        await c.env.DB.prepare('DELETE FROM records WHERE record_id = ?')
-            .bind(record_id)
-            .run();
+        try {
+            await c.env.DB.prepare('DELETE FROM records WHERE record_id = ?')
+                .bind(record_id)
+                .run();
+        } catch (err: any) {
+            console.error('Delete error:', err);
+            return c.json(
+                { success: false, errors: [{ code: 5000, message: 'Failed to delete record' }] },
+                500
+            );
+        }
 
-        return { success: true };
+        return c.json({ success: true }, 200);
     }
 }
