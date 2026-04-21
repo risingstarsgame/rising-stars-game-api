@@ -1,5 +1,8 @@
 import { OpenAPIRoute } from 'chanfana';
 import { z } from 'zod';
+import { recordResponseSchema } from './base';
+import { ungzipBlob } from '../../utils/compression';
+import { decode as msgpackDecode } from '@msgpack/msgpack';
 
 export class GetRecord extends OpenAPIRoute {
     public schema = {
@@ -13,15 +16,29 @@ export class GetRecord extends OpenAPIRoute {
         },
         responses: {
             '200': {
-                description: 'Raw gzipped MessagePack blob with metadata in headers',
+                description: 'Record data returned',
                 content: {
-                    'application/msgpack': {
-                        schema: z.any(), // binary response, no specific schema
+                    'application/json': {
+                        schema: z.object({
+                            success: z.boolean(),
+                            result: recordResponseSchema,
+                        }),
                     },
                 },
             },
             '404': {
                 description: 'Record not found',
+                content: {
+                    'application/json': {
+                        schema: z.object({
+                            success: z.boolean(),
+                            errors: z.array(z.object({ code: z.number(), message: z.string() })),
+                        }),
+                    },
+                },
+            },
+            '500': {
+                description: 'Decompression error',
                 content: {
                     'application/json': {
                         schema: z.object({
@@ -50,24 +67,33 @@ export class GetRecord extends OpenAPIRoute {
             );
         }
 
-        const headers: Record<string, string> = {
-            'Content-Type': 'application/msgpack',
-            'Content-Encoding': 'gzip',
-            'X-Record-Id': row.record_id,
-            'X-Performance-Id': row.performance_id,
-            'X-User-Id': String(row.user_id),
-            'X-Frame-Count': String(row.frame_count),
-            'X-Record-Duration': String(row.record_duration),
-            'X-Created-At': row.created_at,
-        };
+        try {
+            // Decompress gzip
+            const decompressed = await ungzipBlob(new Uint8Array(row.data_blob));
+            // Decode MessagePack
+            const blobData = msgpackDecode(decompressed) as any;
 
-        if (row.outfit_id !== null && row.outfit_id !== undefined) {
-            headers['X-Outfit-Id'] = String(row.outfit_id);
+            const result = {
+                record_id: row.record_id,
+                performance_id: row.performance_id,
+                user_id: row.user_id,
+                outfit_id: row.outfit_id ?? undefined,
+                frame_count: row.frame_count,
+                record_duration: row.record_duration,
+                frames: blobData.frames,
+                frame_times: blobData.frameTimes,
+                frame_interval_map: blobData.frameIntervalMap,
+                animation_tracks: blobData.animationTracks,
+                created_at: row.created_at,
+            };
+
+            return { success: true, result };
+        } catch (err: any) {
+            console.error('Decompression/decode error:', err);
+            return c.json(
+                { success: false, errors: [{ code: 5002, message: 'Failed to decode record data' }] },
+                500
+            );
         }
-
-        return new Response(row.data_blob, {
-            status: 200,
-            headers,
-        });
     }
 }

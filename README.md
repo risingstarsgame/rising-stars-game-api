@@ -39,11 +39,11 @@ tests/                          – Integration tests using Vitest.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/records` | Store a new record. Body must be a gzip-compressed MessagePack blob (`Content-Type: application/msgpack`, `Content-Encoding: gzip`). Metadata is passed via custom headers. Returns `{ success: true }` on success. |
-| `GET` | `/records/:record_id` | Retrieve a record. Decompresses and decodes the MessagePack blob before returning. Returns `404` if not found. |
+| `POST` | `/records` | Store a new record. Body must be a gzip-compressed MessagePack blob. Metadata is passed via custom request headers. Returns `{ success: true }` on success. |
+| `GET` | `/records/:record_id` | Retrieve a record. Decompresses and decodes the MessagePack blob, returning a JSON object. Returns `404` if not found. |
 | `DELETE` | `/records/:record_id` | Delete a record. Returns `{ success: true }` on success. |
 
-#### `POST /records` — Required Headers
+#### `POST /records` — Request Headers
 
 | Header | Type | Description |
 |--------|------|-------------|
@@ -60,7 +60,7 @@ tests/                          – Integration tests using Vitest.
 
 ## Data Schemas
 
-### Model Exports (KV)
+### Model Export (KV)
 
 ```json
 {
@@ -71,7 +71,7 @@ tests/                          – Integration tests using Vitest.
 }
 ```
 
-### Performance Records (D1)
+### Performance Record (D1)
 
 **Top-level fields:**
 
@@ -192,7 +192,7 @@ All errors follow this structure:
 | `4041` | Resource not found (record or export) |
 | `409` | Duplicate ID |
 | `5000` | Internal server error (D1 or KV failure) |
-| `5002` | Failed to decompress or decode record blob |
+| `5002` | Failed to decompress or decode record data |
 | `7000` | Unhandled exception |
 
 ---
