@@ -85,17 +85,14 @@ Records are stored as gzip-compressed MessagePack blobs and returned as JSON aft
 | `outfit_id` | number (optional) | |
 | `frame_count` | number | |
 | `record_duration` | number | Duration in seconds |
-| `animation_tracks` | array of strings | |
 | `frame_interval_map` | array of numbers | |
-| `frame_times` | array of numbers | |
+| `animation_tracks` | array of strings | |
 | `created_at` | string | ISO datetime |
 
 **`frames` field** — array of objects with the following structure:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | number | |
-| `time` | number | |
 | `animation_id` | number (optional) | |
 | `animation_speed` | string (optional) | |
 | `emote_playing` | boolean (optional) | |

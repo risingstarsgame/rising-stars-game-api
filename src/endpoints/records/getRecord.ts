@@ -81,7 +81,6 @@ export class GetRecord extends OpenAPIRoute {
                 frame_count: row.frame_count,
                 record_duration: row.record_duration,
                 frames: blobData.frames,
-                frame_times: blobData.frame_times,
                 frame_interval_map: blobData.frame_interval_map,
                 animation_tracks: blobData.animation_tracks,
                 created_at: row.created_at,

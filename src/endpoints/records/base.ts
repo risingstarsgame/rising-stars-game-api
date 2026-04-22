@@ -1,8 +1,6 @@
 import { z } from 'zod';
 
 export const frameSchema = z.object({
-    id: z.number(),
-    time: z.number(),
     animation_id: z.number().optional(),
     animation_speed: z.string().optional(),
     emote_playing: z.boolean().optional(),
@@ -17,7 +15,6 @@ export const frameSchema = z.object({
 // The four fields combined (data_blob)
 export const dataBlobSchema = z.object({
     frames: z.array(frameSchema),
-    frame_times: z.array(z.number()),
     frame_interval_map: z.array(z.number()),
     animation_tracks: z.array(z.string())
 });
@@ -31,7 +28,6 @@ export const recordResponseSchema = z.object({
     frame_count: z.number().int().positive(),
     record_duration: z.number().int().positive(),
     frames: z.array(frameSchema),
-    frame_times: z.array(z.number()),
     frame_interval_map: z.array(z.number()),
     animation_tracks: z.array(z.string()),
     created_at: z.string().datetime().optional(),
