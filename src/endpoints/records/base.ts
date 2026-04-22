@@ -3,23 +3,23 @@ import { z } from 'zod';
 export const frameSchema = z.object({
     id: z.number(),
     time: z.number(),
-    animationId: z.number().optional(),
-    animationSpeed: z.string().optional(),
-    emotePlaying: z.boolean().optional(),
-    frameInterval: z.number(),
-    hrpRelativeCF: z.object({
+    animation_id: z.number().optional(),
+    animation_speed: z.string().optional(),
+    emote_playing: z.boolean().optional(),
+    frame_interval: z.number(),
+    hrp_relative_cf: z.object({
         pos: z.array(z.string()),
         rot: z.array(z.string()),
     }),
-    playerMessage: z.string().optional(),
+    player_message: z.string().optional(),
 });
 
 // The four fields combined (data_blob)
 export const dataBlobSchema = z.object({
     frames: z.array(frameSchema),
-    frameTimes: z.array(z.number()),
-    frameIntervalMap: z.array(z.number()),
-    animationTracks: z.array(z.string()),
+    frame_times: z.array(z.number()),
+    frame_interval_map: z.array(z.number()),
+    animation_tracks: z.array(z.string())
 });
 
 // Full record response (after decompression)

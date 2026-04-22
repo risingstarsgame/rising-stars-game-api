@@ -40,7 +40,7 @@ tests/                          – Integration tests using Vitest.
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/records` | Store a new record. Body must be a gzip-compressed MessagePack blob. Metadata is passed via custom request headers. Returns `{ success: true }` on success. |
-| `GET` | `/records/:record_id` | Retrieve a record. Decompresses and decodes the MessagePack blob, returning a JSON object. Returns `404` if not found. |
+| `GET` | `/records/:record_id` | Retrieve a record. Decompresses and decodes the stored blob server-side, returning a JSON object. Returns `404` if not found, `500` on decompression failure. |
 | `DELETE` | `/records/:record_id` | Delete a record. Returns `{ success: true }` on success. |
 
 #### `POST /records` — Request Headers
@@ -73,6 +73,8 @@ tests/                          – Integration tests using Vitest.
 
 ### Performance Record (D1)
 
+Records are stored as gzip-compressed MessagePack blobs and returned as JSON after server-side decompression.
+
 **Top-level fields:**
 
 | Field | Type | Description |
@@ -94,12 +96,12 @@ tests/                          – Integration tests using Vitest.
 |-------|------|-------------|
 | `id` | number | |
 | `time` | number | |
-| `animationId` | number (optional) | |
-| `animationSpeed` | string (optional) | |
-| `emotePlaying` | boolean (optional) | |
-| `frameInterval` | number | Index into `frame_interval_map` |
-| `hrpRelativeCF` | object | Contains `pos` and `rot` arrays of strings |
-| `playerMessage` | string (optional) | |
+| `animation_id` | number (optional) | |
+| `animation_speed` | string (optional) | |
+| `emote_playing` | boolean (optional) | |
+| `frame_interval` | number | Index into `frame_interval_map` |
+| `hrp_relative_cf` | object | Contains `pos` and `rot` arrays of strings |
+| `player_message` | string (optional) | |
 
 ---
 
