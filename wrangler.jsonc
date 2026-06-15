@@ -1,11 +1,16 @@
 {
-	"compatibility_date": "2025-10-08",
+	"compatibility_date": "2026-06-15",
 	"main": "src/index.ts",
 	"name": "rising-stars-game-api",
 	"upload_source_maps": true,
 	"observability": {
 		"enabled": true
 	},
+	"triggers": {
+		"crons": [
+			"0 0 * * *"
+		]
+  	},
 	"d1_databases": [
 		{
 			"binding": "DB",

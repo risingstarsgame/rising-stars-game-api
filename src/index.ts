@@ -2,6 +2,7 @@ import { ApiException, fromHono } from "chanfana";
 import { Hono, Context, Next } from "hono";
 import { recordsRouter } from "./endpoints/records/router";
 import { modelExportsRouter } from "./endpoints/model_exports/router";
+import { cleanupExpiredSoftDeletedRecords } from './scheduled/cleanupExpiredSoftDeletedRecords';
 import { ContentfulStatusCode } from "hono/utils/http-status";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -54,4 +55,10 @@ const openapi = fromHono(app, {
 openapi.route("/exports", modelExportsRouter);
 openapi.route("/records", recordsRouter);
 
-export default app;
+// ----- Cron trigger for hard deletion -----
+export default {
+    fetch: app.fetch,
+    async scheduled(controller: ScheduledController, env: any, ctx: ExecutionContext) {
+        ctx.waitUntil(cleanupExpiredSoftDeletedRecords(env));
+    },
+};

@@ -37,6 +37,17 @@ export class GetRecord extends OpenAPIRoute {
                     },
                 },
             },
+            '410': {
+                description: 'Record has been soft‑deleted',
+                content: {
+                    'application/json': {
+                        schema: z.object({
+                            success: z.boolean(),
+                            errors: z.array(z.object({ code: z.number(), message: z.string() })),
+                        }),
+                    },
+                },
+            },
             '500': {
                 description: 'Decompression error',
                 content: {
@@ -56,7 +67,7 @@ export class GetRecord extends OpenAPIRoute {
 
         const row = await c.env.DB.prepare(
             `SELECT record_id, performance_id, user_id, outfit_id,
-                    frame_count, record_duration, data_blob, created_at
+                    frame_count, record_duration, data_blob, created_at, deleted
              FROM records WHERE record_id = ?`
         ).bind(record_id).first();
 
@@ -64,6 +75,14 @@ export class GetRecord extends OpenAPIRoute {
             return c.json(
                 { success: false, errors: [{ code: 4041, message: 'Record not found' }] },
                 404
+            );
+        }
+
+        // Return 410 if the record has been soft‑deleted
+        if (row.deleted === 1) {
+            return c.json(
+                { success: false, errors: [{ code: 4101, message: 'Record has been deleted' }] },
+                410
             );
         }
 
@@ -89,6 +108,7 @@ export class GetRecord extends OpenAPIRoute {
             return { success: true, result };
         } catch (err: any) {
             console.error('Decompression/decode error:', err);
+            
             return c.json(
                 { success: false, errors: [{ code: 5002, message: 'Failed to decode record data' }] },
                 500
